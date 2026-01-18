@@ -1,0 +1,152 @@
+import React, { useState } from "react";
+
+const diceFaces = [1, 2, 3, 4, 5, 6];
+
+const correctCombos = {
+  2: [[1, 1]],
+  3: [[1, 2]],
+  4: [[1, 3], [2, 2]],
+  5: [[1, 4], [2, 3]],
+  6: [[1, 5], [2, 4], [3, 3]],
+  7: [[1, 6], [2, 5], [3, 4]],
+  8: [[2, 6], [3, 5], [4, 4]],
+  9: [[3, 6], [4, 5]],
+  10: [[4, 6], [5, 5]],
+  11: [[5, 6]],
+  12: [[6, 6]],
+};
+
+function Dice({ value }) {
+  const dots = {
+    1: [[2, 2]],
+    2: [[1, 1], [3, 3]],
+    3: [[1, 1], [2, 2], [3, 3]],
+    4: [[1, 1], [1, 3], [3, 1], [3, 3]],
+    5: [[1, 1], [1, 3], [2, 2], [3, 1], [3, 3]],
+    6: [[1, 1], [2, 1], [3, 1], [1, 3], [2, 3], [3, 3]],
+  };
+
+  return (
+    <div className="w-12 h-12 bg-white rounded-xl shadow grid grid-cols-3 grid-rows-3 p-1">
+      {Array.from({ length: 9 }).map((_, i) => {
+        const row = Math.floor(i / 3) + 1;
+        const col = (i % 3) + 1;
+        const show = dots[value].some(([r, c]) => r === row && c === col);
+        return (
+          <div key={i} className="flex items-center justify-center">
+            {show && <div className="w-2.5 h-2.5 bg-black rounded-full" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function DiceSumApp() {
+  const [pairs, setPairs] = useState({});
+  const [currentPair, setCurrentPair] = useState({});
+  const [errorPair, setErrorPair] = useState({});
+  const [tipLevel, setTipLevel] = useState({});
+
+  const handleDrop = (sum, value) => {
+    const temp = currentPair[sum] || [];
+    if (temp.length === 2) return;
+
+    const updatedTemp = [...temp, value];
+    setCurrentPair({ ...currentPair, [sum]: updatedTemp });
+
+    if (updatedTemp.length === 2) {
+      const sorted = [...updatedTemp].sort((a, b) => a - b);
+      const valid = correctCombos[sum].some(
+        (c) => c[0] === sorted[0] && c[1] === sorted[1]
+      );
+
+      if (valid) {
+        setPairs((prev) => ({
+          ...prev,
+          [sum]: [...(prev[sum] || []), sorted],
+        }));
+        setErrorPair((prev) => ({ ...prev, [sum]: false }));
+      } else {
+        setErrorPair((prev) => ({ ...prev, [sum]: true }));
+      }
+
+      setTimeout(() => {
+        setCurrentPair((prev) => ({ ...prev, [sum]: [] }));
+        setErrorPair((prev) => ({ ...prev, [sum]: false }));
+      }, 800);
+    }
+  };
+
+  const remaining = (sum) => correctCombos[sum].length - (pairs[sum]?.length || 0);
+  const allDone = Object.keys(correctCombos).every((s) => remaining(s) === 0);
+
+  const nextTip = (sum) => {
+    setTipLevel((prev) => ({ ...prev, [sum]: Math.min((prev[sum] || 0) + 1, 2) }));
+  };
+
+  return (
+    <div className="p-6 space-y-6" style={{ fontFamily: "'DR Hand', cursive" }}>
+      <h1 className="text-2xl font-bold" style={{ fontFamily: "'DR Hand', cursive" }}>Welche Möglichkeiten gibt es, die Augensumme zu würfeln?</h1>
+      <p className="text-gray-600">Wenn du einen Tipp benötigst, klicke auf die Glühbirne.</p>
+
+      <div className="flex gap-4">
+        {diceFaces.map((face) => (
+          <div key={face} draggable onDragStart={(e) => e.dataTransfer.setData("text", face)} className="cursor-grab">
+            <Dice value={face} />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {Object.keys(correctCombos).map((sum) => (
+          <div
+            key={sum}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleDrop(Number(sum), Number(e.dataTransfer.getData("text")))}
+            className={`p-4 rounded-2xl border shadow ${errorPair[sum] ? "bg-red-100" : ""}`}
+          >
+            <div className="flex justify-between items-center">
+              <h2 className="font-semibold">Augensumme {sum}</h2>
+              <button onClick={() => nextTip(sum)} className="text-xl">💡{tipLevel[sum] === 2 && "💡"}</button>
+            </div>
+
+            {tipLevel[sum] >= 1 && (
+              <p className="mt-1 text-sm">Noch {remaining(sum)} Paar{remaining(sum) !== 1 ? "e" : ""} fehlen</p>
+            )}
+
+            {tipLevel[sum] >= 2 && (
+              <p className="text-xs text-gray-500 mt-1">
+                Möglichkeiten: {correctCombos[sum].map((c) => c.join(" + ")).join(", ")}
+              </p>
+            )}
+
+            <div className="flex flex-col gap-2 mt-2">
+              {(pairs[sum] || []).map((pair, i) => (
+                <div key={i} className="flex gap-2 items-center bg-green-50 p-2 rounded-xl">
+                  <Dice value={pair[0]} />
+                  <span className="font-bold">+</span>
+                  <Dice value={pair[1]} />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2 mt-2">
+              {(currentPair[sum] || []).map((v, i) => (
+                <Dice key={i} value={v} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {allDone && (
+        <div className="mt-6 p-6 bg-yellow-100 rounded-2xl text-center">
+          <h2 className="text-2xl font-bold">🎉 Super gemacht!</h2>
+          <p>Du hast alle Würfelpaare gefunden!</p>
+          <div className="text-4xl mt-2">⭐ ⭐ ⭐</div>
+        </div>
+      )}
+    </div>
+  );
+}
